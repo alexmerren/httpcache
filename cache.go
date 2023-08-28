@@ -9,7 +9,7 @@ import (
 
 var DefaultClient = NewDefaultClient()
 
-var unacceptableResponseCodes = []int{
+var defaultDeniedResponseCodes = []int{
 	http.StatusNotFound,
 	http.StatusBadRequest,
 	http.StatusForbidden,
@@ -18,14 +18,21 @@ var unacceptableResponseCodes = []int{
 }
 
 type CachedClient struct {
-	httpClient *http.Client
-	cacheStore ResponseStorer
+	httpClient         *http.Client
+	cacheStore         ResponseStorer
+	deniedStatusCodes  []int
+	allowedStatusCodes []int
 }
 
 func NewDefaultClient() *CachedClient {
+	return NewCachedClient(NewDefaultResponseStore(), defaultDeniedResponseCodes)
+}
+
+func NewCachedClient(responseStore ResponseStorer, deniedStatusCodes []int) *CachedClient {
 	return &CachedClient{
-		httpClient: http.DefaultClient,
-		cacheStore: NewDefaultResponseStore(),
+		httpClient:        http.DefaultClient,
+		cacheStore:        responseStore,
+		deniedStatusCodes: deniedStatusCodes,
 	}
 }
 
@@ -55,7 +62,8 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 		defer body.Close()
 	}
 
-	// Reset the request body so that it can be read by the cache store.
+	// Do() reads the request body, so we reset the request body so that the
+	// cache store can read it as part of the composite key.
 	response, err = h.httpClient.Do(request)
 	if err != nil {
 		request.Body.Close()
@@ -63,8 +71,7 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	}
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
-	// Not sure what to do here... maybe set cachable response codes in struct?
-	if contains(unacceptableResponseCodes, response.StatusCode) {
+	if contains(h.deniedStatusCodes, response.StatusCode) {
 		return response, nil
 	}
 
