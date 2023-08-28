@@ -9,13 +9,19 @@ import (
 
 var DefaultClient = NewDefaultClient()
 
-var defaultDeniedResponseCodes = []int{
-	http.StatusNotFound,
-	http.StatusBadRequest,
-	http.StatusForbidden,
-	http.StatusUnauthorized,
-	http.StatusMethodNotAllowed,
-}
+var (
+	defaultDeniedResponseCodes = []int{
+		http.StatusNotFound,
+		http.StatusBadRequest,
+		http.StatusForbidden,
+		http.StatusUnauthorized,
+		http.StatusMethodNotAllowed,
+	}
+
+	defaultAcceptedResponseCodes = []int{
+		http.StatusOK,
+	}
+)
 
 type CachedClient struct {
 	httpClient         *http.Client
@@ -25,14 +31,15 @@ type CachedClient struct {
 }
 
 func NewDefaultClient() *CachedClient {
-	return NewCachedClient(NewDefaultResponseStore(), defaultDeniedResponseCodes)
+	return NewCachedClient(NewDefaultResponseStore(), defaultDeniedResponseCodes, defaultAcceptedResponseCodes)
 }
 
-func NewCachedClient(responseStore ResponseStorer, deniedStatusCodes []int) *CachedClient {
+func NewCachedClient(responseStore ResponseStorer, deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
 	return &CachedClient{
-		httpClient:        http.DefaultClient,
-		cacheStore:        responseStore,
-		deniedStatusCodes: deniedStatusCodes,
+		httpClient:         http.DefaultClient,
+		cacheStore:         responseStore,
+		deniedStatusCodes:  deniedStatusCodes,
+		allowedStatusCodes: allowedStatusCodes,
 	}
 }
 
@@ -66,7 +73,6 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	// cache store can read it as part of the composite key.
 	response, err = h.httpClient.Do(request)
 	if err != nil {
-		request.Body.Close()
 		return nil, err
 	}
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
