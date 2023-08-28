@@ -5,8 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-
-	"golang.org/x/exp/slices"
 )
 
 var DefaultClient = NewDefaultClient()
@@ -38,6 +36,10 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 		return response, nil
 	}
 
+	if err != nil && !errors.Is(err, ErrNoResponse) {
+		return nil, err
+	}
+
 	// Store a copy of the request body so we can retrieve it after calling
 	// httpClient.Do(request).
 	requestBody := []byte{}
@@ -53,11 +55,7 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 		defer body.Close()
 	}
 
-	if err != nil && !errors.Is(err, ErrNoResponse) {
-		return nil, err
-	}
-
-	// Reset the request body (again) so that it can be read by the cache store.
+	// Reset the request body so that it can be read by the cache store.
 	response, err = h.httpClient.Do(request)
 	if err != nil {
 		request.Body.Close()
@@ -66,7 +64,7 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
 	// Not sure what to do here... maybe set cachable response codes in struct?
-	if slices.Contains(unacceptableResponseCodes, response.StatusCode) {
+	if contains(unacceptableResponseCodes, response.StatusCode) {
 		return response, nil
 	}
 
