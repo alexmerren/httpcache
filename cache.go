@@ -81,6 +81,10 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 		return response, nil
 	}
 
+	if !contains(h.allowedStatusCodes, response.StatusCode) {
+		return response, nil
+	}
+
 	err = h.cacheStore.Create(response)
 	if err != nil {
 		response.Body.Close()
