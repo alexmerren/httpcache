@@ -18,7 +18,7 @@ var (
 		http.StatusMethodNotAllowed,
 	}
 
-	defaultAcceptedResponseCodes = []int{
+	defaultAllowedResponseCodes = []int{
 		http.StatusOK,
 	}
 )
@@ -31,10 +31,14 @@ type CachedClient struct {
 }
 
 func NewDefaultClient() *CachedClient {
-	return NewCachedClient(NewDefaultResponseStore(), defaultDeniedResponseCodes, defaultAcceptedResponseCodes)
+	return NewCachedClientWithStore(NewDefaultResponseStore(), defaultDeniedResponseCodes, defaultAllowedResponseCodes)
 }
 
-func NewCachedClient(responseStore ResponseStorer, deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
+func NewCachedClient(deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
+	return NewCachedClientWithStore(NewDefaultResponseStore(), deniedResponseCodes, allowedStatusCodes)
+}
+
+func NewCachedClientWithStore(responseStore ResponseStorer, deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
 	return &CachedClient{
 		httpClient:         http.DefaultClient,
 		cacheStore:         responseStore,
