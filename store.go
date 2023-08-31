@@ -108,9 +108,9 @@ func (s *SqliteResponseStore) Read(request *http.Request) (*http.Response, error
 		defer body.Close()
 	}
 
-	row := s.database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
 	responseBody := ""
 	responseStatusCode := 0
+	row := s.database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
 	err := row.Scan(&responseBody, &responseStatusCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

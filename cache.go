@@ -5,29 +5,41 @@ import (
 	"errors"
 	"io"
 	"net/http"
-
-	"golang.org/x/exp/slices"
 )
 
 var DefaultClient = NewDefaultClient()
 
-var unacceptableResponseCodes = []int{
-	http.StatusNotFound,
-	http.StatusBadRequest,
-	http.StatusForbidden,
-	http.StatusUnauthorized,
-	http.StatusMethodNotAllowed,
-}
+var (
+	defaultDeniedResponseCodes = []int{
+		http.StatusNotFound,
+		http.StatusBadRequest,
+		http.StatusForbidden,
+		http.StatusUnauthorized,
+		http.StatusMethodNotAllowed,
+	}
+
+	defaultAcceptedResponseCodes = []int{
+		http.StatusOK,
+	}
+)
 
 type CachedClient struct {
-	httpClient *http.Client
-	cacheStore ResponseStorer
+	httpClient         *http.Client
+	cacheStore         ResponseStorer
+	deniedStatusCodes  []int
+	allowedStatusCodes []int
 }
 
 func NewDefaultClient() *CachedClient {
+	return NewCachedClient(NewDefaultResponseStore(), defaultDeniedResponseCodes, defaultAcceptedResponseCodes)
+}
+
+func NewCachedClient(responseStore ResponseStorer, deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
 	return &CachedClient{
-		httpClient: http.DefaultClient,
-		cacheStore: NewDefaultResponseStore(),
+		httpClient:         http.DefaultClient,
+		cacheStore:         responseStore,
+		deniedStatusCodes:  deniedStatusCodes,
+		allowedStatusCodes: allowedStatusCodes,
 	}
 }
 
@@ -36,6 +48,10 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	response, err := h.cacheStore.Read(request)
 	if err == nil {
 		return response, nil
+	}
+
+	if err != nil && !errors.Is(err, ErrNoResponse) {
+		return nil, err
 	}
 
 	// Store a copy of the request body so we can retrieve it after calling
@@ -53,20 +69,19 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 		defer body.Close()
 	}
 
-	if err != nil && !errors.Is(err, ErrNoResponse) {
-		return nil, err
-	}
-
-	// Reset the request body (again) so that it can be read by the cache store.
+	// Do() reads the request body, so we reset the request body so that the
+	// cache store can read it as part of the composite key.
 	response, err = h.httpClient.Do(request)
 	if err != nil {
-		request.Body.Close()
 		return nil, err
 	}
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
-	// Not sure what to do here... maybe set cachable response codes in struct?
-	if slices.Contains(unacceptableResponseCodes, response.StatusCode) {
+	if contains(h.deniedStatusCodes, response.StatusCode) {
+		return response, nil
+	}
+
+	if !contains(h.allowedStatusCodes, response.StatusCode) {
 		return response, nil
 	}
 
