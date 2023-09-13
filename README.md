@@ -15,7 +15,7 @@ no cost to re-do cacheable API requests.
 The project can be installed using the following:
 
 ```bash
-go get github.com/alexmerren/httcache
+go get github.com/alexmerren/httpcache
 ```
 
 ## 📝 Example
