@@ -1,8 +1,8 @@
 GO ?= go
 
-SOURCE = cache.go
+SOURCE = round_tripper.go
 CONTAINER = http-cache
-SOURCE_PATH = /go/src/github.com/buger/jsonparser
+SOURCE_PATH = /go/src/github.com/alexmerren/httpcache
 TEST = .
 DRUN = docker run -v `pwd`:$(SOURCE_PATH) -i -t $(CONTAINER)
 

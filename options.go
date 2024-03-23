@@ -1,11 +1,5 @@
 package httpcache
 
-func WithName(name string) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
-		c.cacheStore = NewSqliteResponseStore(name)
-	}
-}
-
 func WithDeniedStatusCodes(deniedStatusCodes []int) func(*CachedRoundTripper) {
 	return func(c *CachedRoundTripper) {
 		c.deniedStatusCodes = deniedStatusCodes
@@ -15,6 +9,12 @@ func WithDeniedStatusCodes(deniedStatusCodes []int) func(*CachedRoundTripper) {
 func WithAllowedStatusCodes(allowedStatusCodes []int) func(*CachedRoundTripper) {
 	return func(c *CachedRoundTripper) {
 		c.allowedStatusCodes = allowedStatusCodes
+	}
+}
+
+func WithName(name string) func(*CachedRoundTripper) {
+	return func(c *CachedRoundTripper) {
+		c.cacheStore = NewSqliteResponseStore(name)
 	}
 }
 

@@ -19,11 +19,10 @@ var (
 	defaultAllowedStatusCodes = []int{
 		http.StatusOK,
 	}
-	defaultCacheStore = NewDefaultResponseStore()
 )
 
 type CachedRoundTripper struct {
-	roundTripper       http.RoundTripper
+	transport          http.RoundTripper
 	cacheStore         ResponseStorer
 	deniedStatusCodes  []int
 	allowedStatusCodes []int
@@ -31,14 +30,17 @@ type CachedRoundTripper struct {
 
 func NewCachedRoundTripper(options ...func(*CachedRoundTripper)) *CachedRoundTripper {
 	roundTripper := &CachedRoundTripper{
-		roundTripper:       http.DefaultTransport,
-		cacheStore:         defaultCacheStore,
+		transport:          http.DefaultTransport,
 		deniedStatusCodes:  defaultDeniedStatusCodes,
 		allowedStatusCodes: defaultAllowedStatusCodes,
 	}
 
 	for _, optionFunc := range options {
 		optionFunc(roundTripper)
+	}
+
+	if roundTripper.cacheStore == nil {
+		roundTripper.cacheStore = NewDefaultResponseStore()
 	}
 
 	return roundTripper
@@ -50,7 +52,7 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 		return response, nil
 	}
 
-	if err != nil && !errors.Is(err, ErrNoResponse) {
+	if !errors.Is(err, ErrNoResponse) {
 		return nil, err
 	}
 
@@ -71,7 +73,7 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 
 	// Do() reads the request body, so we reset the request body so that the
 	// cache store can read it as part of the composite key.
-	response, err = h.roundTripper.RoundTrip(request)
+	response, err = h.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
 	}
