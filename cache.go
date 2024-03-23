@@ -7,8 +7,6 @@ import (
 	"net/http"
 )
 
-var DefaultClient = NewDefaultClient()
-
 var (
 	defaultDeniedStatusCodes = []int{
 		http.StatusNotFound,
@@ -21,34 +19,32 @@ var (
 	defaultAllowedStatusCodes = []int{
 		http.StatusOK,
 	}
+	defaultCacheStore = NewDefaultResponseStore()
 )
 
-type CachedClient struct {
-	httpClient         *http.Client
+type CachedRoundTripper struct {
+	roundTripper       http.RoundTripper
 	cacheStore         ResponseStorer
 	deniedStatusCodes  []int
 	allowedStatusCodes []int
 }
 
-func NewDefaultClient() *CachedClient {
-	return NewCachedClientWithStore(NewDefaultResponseStore(), defaultDeniedStatusCodes, defaultAllowedStatusCodes)
-}
-
-func NewCachedClient(deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
-	return NewCachedClientWithStore(NewDefaultResponseStore(), deniedStatusCodes, allowedStatusCodes)
-}
-
-func NewCachedClientWithStore(responseStore ResponseStorer, deniedStatusCodes, allowedStatusCodes []int) *CachedClient {
-	return &CachedClient{
-		httpClient:         http.DefaultClient,
-		cacheStore:         responseStore,
-		deniedStatusCodes:  deniedStatusCodes,
-		allowedStatusCodes: allowedStatusCodes,
+func NewCachedRoundTripper(options ...func(*CachedRoundTripper)) *CachedRoundTripper {
+	roundTripper := &CachedRoundTripper{
+		roundTripper:       http.DefaultTransport,
+		cacheStore:         defaultCacheStore,
+		deniedStatusCodes:  defaultDeniedStatusCodes,
+		allowedStatusCodes: defaultAllowedStatusCodes,
 	}
+
+	for _, optionFunc := range options {
+		optionFunc(roundTripper)
+	}
+
+	return roundTripper
 }
 
-// User is expected to close the response body.
-func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
+func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	response, err := h.cacheStore.Read(request)
 	if err == nil {
 		return response, nil
@@ -59,7 +55,7 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	}
 
 	// Store a copy of the request body so we can retrieve it after calling
-	// httpClient.Do(request).
+	// roundTripper.RoundTrip(request).
 	requestBody := []byte{}
 	if request.GetBody != nil {
 		body, err := request.GetBody()
@@ -75,7 +71,7 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 
 	// Do() reads the request body, so we reset the request body so that the
 	// cache store can read it as part of the composite key.
-	response, err = h.httpClient.Do(request)
+	response, err = h.roundTripper.RoundTrip(request)
 	if err != nil {
 		return nil, err
 	}
@@ -97,67 +93,4 @@ func (h *CachedClient) Do(request *http.Request) (*http.Response, error) {
 	}
 
 	return response, nil
-}
-
-func (h *CachedClient) Get(URL string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodGet, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Head(URL string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodHead, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Post(URL string, body io.Reader) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodPost, URL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Put(URL string, body io.Reader) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodPut, URL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Patch(URL string, body io.Reader) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodPatch, URL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Delete(URL string, body io.Reader) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodDelete, URL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
-}
-
-func (h *CachedClient) Options(URL string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodOptions, URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.Do(request)
 }
