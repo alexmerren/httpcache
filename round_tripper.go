@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 )
 
 var (
@@ -19,11 +20,16 @@ var (
 	defaultAllowedStatusCodes = []int{
 		http.StatusOK,
 	}
+
+	defaultExpiryTime = time.Duration(0)
+
+	defaultCacheName = "httpcache.sqlite"
 )
 
 type CachedRoundTripper struct {
 	transport          http.RoundTripper
-	cacheStore         ResponseStorer
+	store              ResponseStorer
+	expiryTime         time.Duration
 	deniedStatusCodes  []int
 	allowedStatusCodes []int
 }
@@ -33,21 +39,22 @@ func NewCachedRoundTripper(options ...func(*CachedRoundTripper)) *CachedRoundTri
 		transport:          http.DefaultTransport,
 		deniedStatusCodes:  defaultDeniedStatusCodes,
 		allowedStatusCodes: defaultAllowedStatusCodes,
+		expiryTime:         defaultExpiryTime,
 	}
 
 	for _, optionFunc := range options {
 		optionFunc(roundTripper)
 	}
 
-	if roundTripper.cacheStore == nil {
-		roundTripper.cacheStore = NewDefaultResponseStore()
+	if roundTripper.store == nil {
+		roundTripper.store = newSqliteResponseStore(defaultCacheName)
 	}
 
 	return roundTripper
 }
 
 func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	response, err := h.cacheStore.Read(request)
+	response, err := h.store.Read(request)
 	if err == nil {
 		return response, nil
 	}
@@ -56,8 +63,6 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 		return nil, err
 	}
 
-	// Store a copy of the request body so we can retrieve it after calling
-	// roundTripper.RoundTrip(request).
 	requestBody := []byte{}
 	if request.GetBody != nil {
 		body, err := request.GetBody()
@@ -71,8 +76,6 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 		defer body.Close()
 	}
 
-	// Do() reads the request body, so we reset the request body so that the
-	// cache store can read it as part of the composite key.
 	response, err = h.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
@@ -87,7 +90,7 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 		return response, nil
 	}
 
-	err = h.cacheStore.Create(response)
+	err = h.store.Save(response)
 	if err != nil {
 		response.Body.Close()
 		response.Request.Body.Close()
@@ -95,4 +98,13 @@ func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 	}
 
 	return response, nil
+}
+
+func contains(slice []int, searchValue int) bool {
+	for index := range slice {
+		if searchValue == slice[index] {
+			return true
+		}
+	}
+	return false
 }
