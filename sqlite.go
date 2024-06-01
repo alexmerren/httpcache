@@ -98,7 +98,7 @@ func (s *sqliteResponseStore) Read(request *http.Request) (*http.Response, error
 }
 
 func (s *sqliteResponseStore) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
-	requestURL := request.URL.RequestURI()
+	requestURL := request.URL.Host + request.URL.RequestURI()
 	requestMethod := request.Method
 	requestBody := []byte{}
 
