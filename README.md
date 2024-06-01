@@ -2,7 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/alexmerren/httpcache)](https://goreportcard.com/report/github.com/alexmerren/httpcache)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.21-61CFDD.svg?style=flat-square)
-![Build Passing](https://github.com/alexmerren/httpcache/actions/workflows/go.yml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alexmerren/httpcache.svg)](https://pkg.go.dev/github.com/alexmerren/httpcache)
 
 HTTPcache is a fast, local cache for HTTP requests and responses and wraps the default `http.RoundTripper` from Go standard library.
 
