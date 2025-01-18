@@ -1,33 +1,45 @@
 package httpcache
 
-import "time"
+import (
+	"time"
+)
 
-func WithDeniedStatusCodes(deniedStatusCodes []int) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
+func WithDeniedStatusCodes(deniedStatusCodes []int) func(*CachedRoundTripper) error {
+	return func(c *CachedRoundTripper) error {
 		c.deniedStatusCodes = deniedStatusCodes
+		return nil
 	}
 }
 
-func WithAllowedStatusCodes(allowedStatusCodes []int) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
+func WithAllowedStatusCodes(allowedStatusCodes []int) func(*CachedRoundTripper) error {
+	return func(c *CachedRoundTripper) error {
 		c.allowedStatusCodes = allowedStatusCodes
+		return nil
 	}
 }
 
-func WithExpiryTime(expiryTime time.Duration) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
+func WithExpiryTime(expiryTime time.Duration) func(*CachedRoundTripper) error {
+	return func(c *CachedRoundTripper) error {
 		c.expiryTime = expiryTime
+		return nil
 	}
 }
 
-func WithName(name string) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
-		c.store = newSqliteResponseStore(name)
+func WithName(name string) func(*CachedRoundTripper) error {
+	return func(c *CachedRoundTripper) error {
+		sqliteStore, err := newSqliteResponseStore(name)
+		if err != nil {
+			return err
+		}
+		c.store = sqliteStore
+
+		return nil
 	}
 }
 
-func WithCacheStore(store ResponseStorer) func(*CachedRoundTripper) {
-	return func(c *CachedRoundTripper) {
+func WithCacheStore(store ResponseStorer) func(*CachedRoundTripper) error {
+	return func(c *CachedRoundTripper) error {
 		c.store = store
+		return nil
 	}
 }

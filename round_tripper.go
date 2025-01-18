@@ -34,7 +34,7 @@ type CachedRoundTripper struct {
 	allowedStatusCodes []int
 }
 
-func NewCachedRoundTripper(options ...func(*CachedRoundTripper)) *CachedRoundTripper {
+func NewCachedRoundTripper(options ...func(*CachedRoundTripper) error) (*CachedRoundTripper, error) {
 	roundTripper := &CachedRoundTripper{
 		transport:          http.DefaultTransport,
 		deniedStatusCodes:  defaultDeniedStatusCodes,
@@ -43,14 +43,23 @@ func NewCachedRoundTripper(options ...func(*CachedRoundTripper)) *CachedRoundTri
 	}
 
 	for _, optionFunc := range options {
-		optionFunc(roundTripper)
+		err := optionFunc(roundTripper)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if roundTripper.store == nil {
-		roundTripper.store = newSqliteResponseStore(defaultCacheName)
+	if roundTripper.store != nil {
+		return roundTripper, nil
 	}
 
-	return roundTripper
+	store, err := newSqliteResponseStore(defaultCacheName)
+	if err != nil {
+		return nil, err
+	}
+	roundTripper.store = store
+
+	return roundTripper, nil
 }
 
 func (h *CachedRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -22,20 +23,32 @@ type sqliteResponseStore struct {
 	database *sql.DB
 }
 
-func newSqliteResponseStore(databaseName string) *sqliteResponseStore {
+func newSqliteResponseStore(databaseName string) (*sqliteResponseStore, error) {
+	fileExists, err := doesFileExist(databaseName)
+	if err != nil {
+		return nil, err
+	}
+
+	if !fileExists {
+		_, err = createFile(databaseName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	conn, err := sql.Open("sqlite3", databaseName)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	_, err = conn.Exec(createDatabaseQuery)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	return &sqliteResponseStore{
 		database: conn,
-	}
+	}, nil
 }
 
 func (s *sqliteResponseStore) Save(response *http.Response) error {
@@ -119,6 +132,11 @@ func (s *sqliteResponseStore) ReadContext(ctx context.Context, request *http.Req
 
 	responseBody := ""
 	responseStatusCode := 0
+
+	if s.database == nil {
+		return nil, fmt.Errorf("database is nil")
+	}
+
 	row := s.database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
 	err := row.Scan(&responseBody, &responseStatusCode)
 	if err != nil {
