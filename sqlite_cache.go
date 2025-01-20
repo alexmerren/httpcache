@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -19,11 +21,13 @@ const (
 	readRequestQuery    = "SELECT response_body, status_code FROM responses WHERE request_url = ? AND request_method = ? AND request_body = ?"
 )
 
-type sqliteResponseStore struct {
-	database *sql.DB
+// Add doc
+type SqliteCache struct {
+	Database *sql.DB
 }
 
-func newSqliteResponseStore(databaseName string) (*sqliteResponseStore, error) {
+// Add doc
+func NewSqliteCache(databaseName string) (*SqliteCache, error) {
 	fileExists, err := doesFileExist(databaseName)
 	if err != nil {
 		return nil, err
@@ -46,16 +50,16 @@ func newSqliteResponseStore(databaseName string) (*sqliteResponseStore, error) {
 		return nil, err
 	}
 
-	return &sqliteResponseStore{
-		database: conn,
+	return &SqliteCache{
+		Database: conn,
 	}, nil
 }
 
-func (s *sqliteResponseStore) Save(response *http.Response) error {
+func (s *SqliteCache) Save(response *http.Response) error {
 	return s.SaveContext(context.Background(), response)
 }
 
-func (s *sqliteResponseStore) SaveContext(ctx context.Context, response *http.Response) error {
+func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) error {
 	requestURL := response.Request.URL.Host + response.Request.URL.RequestURI()
 	requestMethod := response.Request.Method
 	requestBody := []byte{}
@@ -84,7 +88,7 @@ func (s *sqliteResponseStore) SaveContext(ctx context.Context, response *http.Re
 	response.Body = io.NopCloser(bytes.NewReader(responseBody))
 	responseStatusCode := response.StatusCode
 
-	tx, err := s.database.BeginTx(ctx, nil)
+	tx, err := s.Database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -106,11 +110,11 @@ func (s *sqliteResponseStore) SaveContext(ctx context.Context, response *http.Re
 	return err
 }
 
-func (s *sqliteResponseStore) Read(request *http.Request) (*http.Response, error) {
+func (s *SqliteCache) Read(request *http.Request) (*http.Response, error) {
 	return s.ReadContext(context.Background(), request)
 }
 
-func (s *sqliteResponseStore) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
+func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
 	requestURL := request.URL.Host + request.URL.RequestURI()
 	requestMethod := request.Method
 	requestBody := []byte{}
@@ -133,11 +137,11 @@ func (s *sqliteResponseStore) ReadContext(ctx context.Context, request *http.Req
 	responseBody := ""
 	responseStatusCode := 0
 
-	if s.database == nil {
+	if s.Database == nil {
 		return nil, fmt.Errorf("database is nil")
 	}
 
-	row := s.database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
+	row := s.Database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
 	err := row.Scan(&responseBody, &responseStatusCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -151,4 +155,31 @@ func (s *sqliteResponseStore) ReadContext(ctx context.Context, request *http.Req
 		Body:       io.NopCloser(strings.NewReader(responseBody)),
 		StatusCode: responseStatusCode,
 	}, nil
+}
+
+func doesFileExist(filename string) (bool, error) {
+	_, err := os.Stat(filename)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func createFile(filename string) (*os.File, error) {
+	directory, err := filepath.Abs(filepath.Dir(filename))
+	if err != nil {
+		return nil, err
+	}
+
+	err = os.MkdirAll(directory, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	return os.Create(filename)
 }
