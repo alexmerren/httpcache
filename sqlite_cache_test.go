@@ -29,7 +29,7 @@ func Test_Save_HappyPath(t *testing.T) {
 	db, mock, closeFunc := aDatabaseMock(t)
 	defer closeFunc()
 
-	subject := &sqliteResponseStore{database: db}
+	subject := &SqliteCache{database: db}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(insertQuery).WithArgs(
@@ -57,7 +57,7 @@ func Test_Read_HappyPath(t *testing.T) {
 	db, mock, closeFunc := aDatabaseMock(t)
 	defer closeFunc()
 
-	subject := &sqliteResponseStore{database: db}
+	subject := &SqliteCache{database: db}
 
 	mockRows := sqlmock.NewRows([]string{"response_body", "status_code"}).
 		AddRow("mock-body", 200).
