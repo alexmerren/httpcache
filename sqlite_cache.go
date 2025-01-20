@@ -23,7 +23,7 @@ const (
 
 // Add doc
 type SqliteCache struct {
-	database *sql.DB
+	Database *sql.DB
 }
 
 // Add doc
@@ -51,7 +51,7 @@ func NewSqliteCache(databaseName string) (*SqliteCache, error) {
 	}
 
 	return &SqliteCache{
-		database: conn,
+		Database: conn,
 	}, nil
 }
 
@@ -88,7 +88,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) 
 	response.Body = io.NopCloser(bytes.NewReader(responseBody))
 	responseStatusCode := response.StatusCode
 
-	tx, err := s.database.BeginTx(ctx, nil)
+	tx, err := s.Database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -137,11 +137,11 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 	responseBody := ""
 	responseStatusCode := 0
 
-	if s.database == nil {
+	if s.Database == nil {
 		return nil, fmt.Errorf("database is nil")
 	}
 
-	row := s.database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
+	row := s.Database.QueryRow(readRequestQuery, requestURL, requestMethod, requestBody)
 	err := row.Scan(&responseBody, &responseStatusCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

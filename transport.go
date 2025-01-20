@@ -68,11 +68,7 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
-	if contains(*t.config.DeniedStatusCodes, response.StatusCode) {
-		return response, nil
-	}
-
-	if !contains(*t.config.AllowedStatusCodes, response.StatusCode) {
+	if !t.shouldSaveResponse(response.StatusCode) {
 		return response, nil
 	}
 
@@ -84,6 +80,13 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 
 	return response, nil
+}
+
+func (t *Transport) shouldSaveResponse(statusCode int) bool {
+	isDeniedStatusCode := contains(*t.config.DeniedStatusCodes, statusCode)
+	isAllowedStatusCode := contains(*t.config.AllowedStatusCodes, statusCode)
+
+	return isDeniedStatusCode || !isAllowedStatusCode
 }
 
 func contains(slice []int, searchValue int) bool {
