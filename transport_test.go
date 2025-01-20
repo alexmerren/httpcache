@@ -2,37 +2,43 @@ package httpcache_test
 
 import "testing"
 
-func Test_RoundTrip_ResponseSavedHappyPath(t *testing.T) {
+func Test_RoundTrip_HappyPath_ResponseSaved(t *testing.T) {
 	// given
 	// when
 	// then
 }
 
-func Test_RoundTrip_ResponseNotSavedHappyPath(t *testing.T) {
+func Test_RoundTrip_HappyPath_ResponseNotSaved(t *testing.T) {
 	// given
 	// when
 	// then
 }
 
-func Test_RoundTrip_ReadFailure(t *testing.T) {
+func Test_RoundTrip_ReadError(t *testing.T) {
 	// given
 	// when
 	// then
 }
 
-func Test_RoundTrip_ResponseHasDeniedCode(t *testing.T) {
+func Test_RoundTrip_ResponseHasNotAllowedStatusCode(t *testing.T) {
 	// given
 	// when
 	// then
 }
 
-func Test_RoundTrip_ResponseHasMiscCode(t *testing.T) {
+func Test_RoundTrip_ResponseHasNotAllowedMethod(t *testing.T) {
 	// given
 	// when
 	// then
 }
 
-func Test_RoundTrip_SaveFailure(t *testing.T) {
+func Test_RoundTrip_TransportError(t *testing.T) {
+	// given
+	// when
+	// then
+}
+
+func Test_RoundTrip_SaveError(t *testing.T) {
 	// given
 	// when
 	// then

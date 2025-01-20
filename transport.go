@@ -68,7 +68,7 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
-	if !t.shouldSaveResponse(response.StatusCode) {
+	if !t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
 		return response, nil
 	}
 
@@ -82,16 +82,16 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	return response, nil
 }
 
-func (t *Transport) shouldSaveResponse(statusCode int) bool {
-	isDeniedStatusCode := contains(*t.config.DeniedStatusCodes, statusCode)
+func (t *Transport) shouldSaveResponse(statusCode int, method string) bool {
 	isAllowedStatusCode := contains(*t.config.AllowedStatusCodes, statusCode)
+	isAllowedMethod := contains(*t.config.AllowedMethods, method)
 
-	return isDeniedStatusCode || !isAllowedStatusCode
+	return !isAllowedStatusCode || !isAllowedMethod
 }
 
-func contains(slice []int, searchValue int) bool {
-	for index := range slice {
-		if searchValue == slice[index] {
+func contains[T comparable](slice []T, searchValue T) bool {
+	for _, value := range slice {
+		if value == searchValue {
 			return true
 		}
 	}

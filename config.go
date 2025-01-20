@@ -9,10 +9,10 @@ type Config struct {
 	Cache Cache
 
 	// Add doc
-	DeniedStatusCodes *[]int
+	AllowedStatusCodes *[]int
 
 	// Add doc
-	AllowedStatusCodes *[]int
+	AllowedMethods *[]string
 }
 
 // Add doc
@@ -21,14 +21,14 @@ func NewConfig() *Config {
 }
 
 // Add doc
-func (c *Config) WithDeniedStatusCodes(deniedStatusCodes []int) *Config {
-	c.DeniedStatusCodes = &deniedStatusCodes
+func (c *Config) WithAllowedStatusCodes(allowedStatusCodes []int) *Config {
+	c.AllowedStatusCodes = &allowedStatusCodes
 	return c
 }
 
 // Add doc
-func (c *Config) WithAllowedStatusCodes(allowedStatusCodes []int) *Config {
-	c.AllowedStatusCodes = &allowedStatusCodes
+func (c *Config) WithAllowedMethods(allowedMethods []string) *Config {
+	c.AllowedMethods = &allowedMethods
 	return c
 }
 
@@ -45,15 +45,11 @@ func DefaultConfig() (*Config, error) {
 	}
 
 	defaultConfig := NewConfig().
-		WithDeniedStatusCodes([]int{
-			http.StatusNotFound,
-			http.StatusBadRequest,
-			http.StatusForbidden,
-			http.StatusUnauthorized,
-			http.StatusMethodNotAllowed,
-		}).
 		WithAllowedStatusCodes([]int{
 			http.StatusOK,
+		}).
+		WithAllowedMethods([]string{
+			http.MethodGet,
 		}).
 		WithCache(cache)
 
