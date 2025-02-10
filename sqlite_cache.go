@@ -68,7 +68,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) 
 	// Reset the response body stream to the beginning to be read again.
 	response.Body = io.NopCloser(responseBody)
 
-	requestUrl := response.Request.URL.Host + response.Request.URL.RequestURI()
+	requestUrl := generateUrl(response.Request)
 	_, err = s.Database.Exec(saveRequestQuery, requestUrl, response.Request.Method, responseBody.Bytes(), response.StatusCode)
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 		return nil, fmt.Errorf("database is nil")
 	}
 
-	requestUrl := request.URL.Host + request.URL.RequestURI()
+	requestUrl := generateUrl(request)
 	row := s.Database.QueryRow(readRequestQuery, requestUrl, request.Method)
 
 	var responseBody []byte
@@ -104,6 +104,10 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 		Body:       io.NopCloser(bytes.NewReader(responseBody)),
 		StatusCode: responseStatusCode,
 	}, nil
+}
+
+func generateUrl(request *http.Request) string {
+	return request.URL.Host + request.URL.RequestURI()
 }
 
 func doesFileExist(filename string) (bool, error) {
