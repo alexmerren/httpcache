@@ -52,14 +52,12 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	if !t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
-		return response, nil
-	}
-
-	err = t.cache.Save(response)
-	if err != nil {
-		response.Body.Close()
-		return nil, err
+	if t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
+		err = t.cache.Save(response)
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
 	}
 
 	return response, nil

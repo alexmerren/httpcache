@@ -59,9 +59,6 @@ func (s *SqliteCache) Save(response *http.Response) error {
 }
 
 func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) error {
-	requestUrl := response.Request.URL.Host + response.Request.URL.RequestURI()
-	requestMethod := response.Request.Method
-
 	responseBody := bytes.NewBuffer(nil)
 	_, err := io.Copy(responseBody, response.Body)
 	if err != nil {
@@ -70,9 +67,9 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) 
 
 	// Reset the response body stream to the beginning to be read again.
 	response.Body = io.NopCloser(responseBody)
-	responseStatusCode := response.StatusCode
 
-	_, err = s.Database.Exec(saveRequestQuery, requestUrl, requestMethod, responseBody.Bytes(), responseStatusCode)
+	requestUrl := response.Request.URL.Host + response.Request.URL.RequestURI()
+	_, err = s.Database.Exec(saveRequestQuery, requestUrl, response.Request.Method, responseBody.Bytes(), response.StatusCode)
 	if err != nil {
 		return err
 	}
@@ -89,9 +86,8 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 		return nil, fmt.Errorf("database is nil")
 	}
 
-	requestURL := request.URL.Host + request.URL.RequestURI()
-	requestMethod := request.Method
-	row := s.Database.QueryRow(readRequestQuery, requestURL, requestMethod)
+	requestUrl := request.URL.Host + request.URL.RequestURI()
+	row := s.Database.QueryRow(readRequestQuery, requestUrl, request.Method)
 
 	var responseBody []byte
 	var responseStatusCode int
