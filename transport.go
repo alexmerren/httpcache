@@ -1,9 +1,7 @@
 package httpcache
 
 import (
-	"bytes"
 	"errors"
-	"io"
 	"net/http"
 )
 
@@ -49,24 +47,10 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	requestBody := []byte{}
-	if request.GetBody != nil {
-		body, err := request.GetBody()
-		if err != nil {
-			return nil, err
-		}
-		requestBody, err = io.ReadAll(body)
-		if err != nil {
-			return nil, err
-		}
-		defer body.Close()
-	}
-
 	response, err = t.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
 	}
-	response.Request.Body = io.NopCloser(bytes.NewReader(requestBody))
 
 	if !t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
 		return response, nil
@@ -75,7 +59,6 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	err = t.cache.Save(response)
 	if err != nil {
 		response.Body.Close()
-		response.Request.Body.Close()
 		return nil, err
 	}
 
@@ -86,7 +69,7 @@ func (t *Transport) shouldSaveResponse(statusCode int, method string) bool {
 	isAllowedStatusCode := contains(*t.config.AllowedStatusCodes, statusCode)
 	isAllowedMethod := contains(*t.config.AllowedMethods, method)
 
-	return !isAllowedStatusCode || !isAllowedMethod
+	return isAllowedStatusCode && isAllowedMethod
 }
 
 func contains[T comparable](slice []T, searchValue T) bool {

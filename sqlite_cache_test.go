@@ -20,8 +20,8 @@ const (
 )
 
 const (
-	insertQuery = `INSERT INTO responses \(request_url, request_method, request_body, response_body, status_code\) VALUES \(\?, \?, \?, \?, \?\)`
-	selectQuery = `SELECT response_body, status_code FROM responses WHERE request_url = \? AND request_method = \? AND request_body = \?`
+	insertQuery = `INSERT INTO responses \(request_url, request_method, response_body, status_code\) VALUES \(\?, \?, \?, \?\)`
+	selectQuery = `SELECT response_body, status_code FROM responses WHERE request_url = \? AND request_method = \?`
 )
 
 func Test_Save_HappyPath(t *testing.T) {
@@ -30,17 +30,14 @@ func Test_Save_HappyPath(t *testing.T) {
 	db, mock, closeFunc := aDatabaseMock(t)
 	defer closeFunc()
 
-	subject := &httpcache.SqliteCache{Database: db}
-
-	mock.ExpectBegin()
 	mock.ExpectExec(insertQuery).WithArgs(
 		testHost+testPath,
 		http.MethodGet,
-		[]byte{},
 		[]byte(testBody),
 		http.StatusOK,
 	).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
+
+	subject := &httpcache.SqliteCache{Database: db}
 
 	// When
 	err := subject.Save(response)
@@ -58,16 +55,13 @@ func Test_Read_HappyPath(t *testing.T) {
 	db, mock, closeFunc := aDatabaseMock(t)
 	defer closeFunc()
 
-	subject := &httpcache.SqliteCache{Database: db}
-
-	mockRows := sqlmock.NewRows([]string{"response_body", "status_code"}).
-		AddRow("mock-body", 200).
-		AddRow("mock-body", 200)
+	mockRows := sqlmock.NewRows([]string{"response_body", "status_code"}).AddRow([]byte(testBody), 200)
 	mock.ExpectQuery(selectQuery).WithArgs(
 		testHost+testPath,
 		http.MethodGet,
-		[]byte{},
 	).WillReturnRows(mockRows)
+
+	subject := &httpcache.SqliteCache{Database: db}
 
 	// When
 	response, err := subject.Read(request)
@@ -75,6 +69,12 @@ func Test_Read_HappyPath(t *testing.T) {
 	// Then
 	assert.Nil(t, err)
 	assert.NotNil(t, response)
+
+	responseBody, err := io.ReadAll(response.Body)
+	defer response.Body.Close()
+	assert.Nil(t, err)
+	assert.Equal(t, string(responseBody), testBody)
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
