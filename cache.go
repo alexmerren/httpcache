@@ -6,23 +6,27 @@ import (
 	"net/http"
 )
 
-// Add doc
+// Cache is the entrypoint for saving and reading responses. This can be
+// implemented for a custom method to cache responses.
 type Cache interface {
 
-	// Add doc
+	// Save a response for a HTTP request using [context.Background].
 	Save(response *http.Response) error
 
-	// Add doc
+	// Read a saved response for a HTTP request using [context.Background].
 	Read(request *http.Request) (*http.Response, error)
 
-	// Add doc
+	// Save a response for a HTTP request with a [context.Context].
 	SaveContext(ctx context.Context, response *http.Response) error
 
-	// Add doc
+	// Read a saved response for a HTTP request with a [context.Context]. If no
+	// response is saved for the corresponding request, return [ErrNoResponse].
 	ReadContext(ctx context.Context, request *http.Request) (*http.Response, error)
 }
 
 var (
-	// Add doc
+	// ErrNoResponse describes when the cache does not have a response stored.
+	// [Transport] will check if ErrNoResponse is returned from [Cache.Read]. If
+	// ErrNoResponse is returned, then the request/response will be saved with [Save].
 	ErrNoResponse = errors.New("no stored response")
 )

@@ -1,57 +1,48 @@
 package httpcache
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
-// Add doc
+var (
+	defaultAllowedStatusCodes = []int{http.StatusOK}
+	defaultAllowedMethods     = []string{http.MethodGet}
+	defaultExpiryTime         = time.Duration(60*24*7) * time.Minute
+)
+
+// Config describes the configuration to use when saving and reading responses
+// from [Cache] using the [Transport].
 type Config struct {
 
-	// Add doc
-	Cache Cache
+	// AllowedStatusCodes describes if a HTTP response should be saved by
+	// checking that it's status code is accepted by [Cache]. If the HTTP
+	// response's status code is not in AllowedStatusCodes, then do not persist.
+	//
+	// This is a required field.
+	AllowedStatusCodes []int
 
-	// Add doc
-	AllowedStatusCodes *[]int
+	// AllowedMethods describes if a HTTP response should be saved by checking
+	// if the HTTP request's method is accepted by the [Cache]. If the HTTP
+	// request's method is not in AllowedMethods, then do not persist.
+	//
+	// This is a required field.
+	AllowedMethods []string
 
-	// Add doc
-	AllowedMethods *[]string
+	// ExpiryTime describes when a HTTP response should be considered invalid.
+	ExpiryTime *time.Duration
 }
 
-// Add doc
-func NewConfig() *Config {
-	return &Config{}
-}
-
-// Add doc
-func (c *Config) WithAllowedStatusCodes(allowedStatusCodes []int) *Config {
-	c.AllowedStatusCodes = &allowedStatusCodes
-	return c
-}
-
-// Add doc
-func (c *Config) WithAllowedMethods(allowedMethods []string) *Config {
-	c.AllowedMethods = &allowedMethods
-	return c
-}
-
-// Add doc
-func (c *Config) WithCache(cache Cache) *Config {
-	c.Cache = cache
-	return c
-}
-
+// DefaultConfig creates a [Config] with default values, namely:
+//   - AllowedStatusCodes: [http.StatusOK]
+//   - AllowedMethods: [http.MethodGet]
+//   - ExpiryTime: 7 days.
 func DefaultConfig() (*Config, error) {
-	cache, err := NewSqliteCache("httpcache.sqlite")
-	if err != nil {
-		return nil, err
-	}
-
-	defaultConfig := NewConfig().
-		WithAllowedStatusCodes([]int{
-			http.StatusOK,
-		}).
-		WithAllowedMethods([]string{
-			http.MethodGet,
-		}).
-		WithCache(cache)
+	defaultConfig := NewConfigBuilder().
+		WithAllowedStatusCodes(defaultAllowedStatusCodes).
+		WithAllowedMethods(defaultAllowedMethods).
+		WithExpiryTime(defaultExpiryTime).
+		Build()
 
 	return defaultConfig, nil
 }

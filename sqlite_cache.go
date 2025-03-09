@@ -20,12 +20,15 @@ const (
 	readRequestQuery    = "SELECT response_body, status_code FROM responses WHERE request_url = ? AND request_method = ?"
 )
 
-// Add doc
+// SqliteCache is a default implementation of [Cache] which creates a local
+// SQLite cache to persist and to query HTTP responses.
 type SqliteCache struct {
 	Database *sql.DB
 }
 
-// Add doc
+// NewSqliteCache creates a new SQLite database with a certain name. This name
+// is the filename of the database. If the file does not exist, then we create
+// it. If the file is in a non-existent directory, we create the directory.
 func NewSqliteCache(databaseName string) (*SqliteCache, error) {
 	fileExists, err := doesFileExist(databaseName)
 	if err != nil {
@@ -58,6 +61,10 @@ func (s *SqliteCache) Save(response *http.Response) error {
 	return s.SaveContext(context.Background(), response)
 }
 
+func (s *SqliteCache) Read(request *http.Request) (*http.Response, error) {
+	return s.ReadContext(context.Background(), request)
+}
+
 func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) error {
 	responseBody := bytes.NewBuffer(nil)
 	_, err := io.Copy(responseBody, response.Body)
@@ -74,11 +81,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) 
 		return err
 	}
 
-	return err
-}
-
-func (s *SqliteCache) Read(request *http.Request) (*http.Response, error) {
-	return s.ReadContext(context.Background(), request)
+	return nil
 }
 
 func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
