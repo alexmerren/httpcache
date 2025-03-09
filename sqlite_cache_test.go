@@ -22,7 +22,7 @@ const (
 )
 
 const (
-	insertQuery = `INSERT INTO responses \( request_url, request_method, response_body, status_code, expiry_time\) VALUES \(\?, \?, \?, \?, \?\) ON CONFLICT REPLACE`
+	insertQuery = `INSERT OR REPLACE INTO responses \( request_url, request_method, response_body, status_code, expiry_time\) VALUES \(\?, \?, \?, \?, \?\)`
 	selectQuery = `SELECT response_body, status_code, expiry_time FROM responses WHERE request_url = \? AND request_method = \?`
 )
 

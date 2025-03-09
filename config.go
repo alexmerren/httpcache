@@ -11,6 +11,16 @@ var (
 	defaultExpiryTime         = time.Duration(60*24*7) * time.Minute
 )
 
+// DefaultConfig creates a [Config] with default values, namely:
+//   - AllowedStatusCodes: [http.StatusOK]
+//   - AllowedMethods: [http.MethodGet]
+//   - ExpiryTime: 7 days.
+var DefaultConfig = NewConfigBuilder().
+	WithAllowedStatusCodes(defaultAllowedStatusCodes).
+	WithAllowedMethods(defaultAllowedMethods).
+	WithExpiryTime(defaultExpiryTime).
+	Build()
+
 // Config describes the configuration to use when saving and reading responses
 // from [Cache] using the [Transport].
 type Config struct {
@@ -31,18 +41,4 @@ type Config struct {
 
 	// ExpiryTime describes when a HTTP response should be considered invalid.
 	ExpiryTime *time.Duration
-}
-
-// DefaultConfig creates a [Config] with default values, namely:
-//   - AllowedStatusCodes: [http.StatusOK]
-//   - AllowedMethods: [http.MethodGet]
-//   - ExpiryTime: 7 days.
-func DefaultConfig() (*Config, error) {
-	defaultConfig := NewConfigBuilder().
-		WithAllowedStatusCodes(defaultAllowedStatusCodes).
-		WithAllowedMethods(defaultAllowedMethods).
-		WithExpiryTime(defaultExpiryTime).
-		Build()
-
-	return defaultConfig, nil
 }

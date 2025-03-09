@@ -24,14 +24,13 @@ const (
 		expiry_time INTEGER)`
 
 	saveRequestQuery = `
-	INSERT INTO responses (
+	INSERT OR REPLACE INTO responses (
 		request_url, 
 		request_method, 
 		response_body, 
 		status_code, 
 		expiry_time) 
-	VALUES (?, ?, ?, ?, ?)
-	ON CONFLICT REPLACE`
+	VALUES (?, ?, ?, ?, ?)`
 
 	readRequestQuery = `
 	SELECT response_body, status_code, expiry_time 
