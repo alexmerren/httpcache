@@ -34,17 +34,17 @@ func main() {
 	// Create a config with a behaviour of:
 	// 	- Storing responses with status code 200;
 	// 	- Storing responses from HTTP requests using method "GET";
-	// 	- Expiring responses after 7 days.
+	// 	- Expiring responses after 7 days...
 	config := httpcache.NewConfigBuilder().
 		WithAllowedStatusCodes([]int{http.StatusOK}).
 		WithAllowedMethods([]string{http.MethodGet}).
 		WithExpiryTime(time.Duration(60*24*7) * time.Minute).
 		Build()
 
-	// ... or use the default config
+	// ... or use the default config.
 	config = httpcache.DefaultConfig
 
-	// Create a transport with the SQLite cache and config
+	// Create a transport with the SQLite cache and config.
 	cachedTransport, _ := httpcache.NewTransport(config, cache)
 
 	// Create a HTTP client with the cached roundtripper.
