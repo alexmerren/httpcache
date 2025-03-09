@@ -31,15 +31,21 @@ func main() {
 	// Create a new SQLite database to store HTTP responses.
 	cache, _ := httpcache.NewSqliteCache("database.sqlite")
 
-	// Use the default config with the SQLite database.
-	// The default config has the behaviour of:
+	// Create a config with a behaviour of:
 	// 	- Storing responses with status code 200;
 	// 	- Storing responses from HTTP requests using method "GET";
 	// 	- Expiring responses after 7 days.
-	cachedTransport, _ := httpcache.NewTransport(
-		httpcache.DefaultConfig,
-		cache,
-	)
+	config := httpcache.NewConfigBuilder().
+		WithAllowedStatusCodes([]int{http.StatusOK}).
+		WithAllowedMethods([]string{http.MethodGet}).
+		WithExpiryTime(time.Duration(60*24*7) * time.Minute).
+		Build()
+
+	// ... or use the default config
+	config = httpcache.DefaultConfig
+
+	// Create a transport with the SQLite cache and config
+	cachedTransport, _ := httpcache.NewTransport(config, cache)
 
 	// Create a HTTP client with the cached roundtripper.
 	httpClient := http.Client{
