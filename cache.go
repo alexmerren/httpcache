@@ -17,11 +17,13 @@ type Cache interface {
 	// Read a saved response for a HTTP request using [context.Background].
 	Read(request *http.Request) (*http.Response, error)
 
-	// Save a response for a HTTP request with a [context.Context].
+	// Save a response for a HTTP request with a [context.Context]. expiryTime
+	// is the duration from [time.Now] to expire the response.
 	SaveContext(ctx context.Context, response *http.Response, expiryTime *time.Duration) error
 
 	// Read a saved response for a HTTP request with a [context.Context]. If no
-	// response is saved for the corresponding request, return [ErrNoResponse].
+	// response is saved for the corresponding request, or the expiryTime has
+	// been surpassed, then return [ErrNoResponse].
 	ReadContext(ctx context.Context, request *http.Request) (*http.Response, error)
 }
 
