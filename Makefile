@@ -16,7 +16,7 @@ fmt:
 	$(DRUN) $(GO) fmt ./...
 
 vet:
-	$(DRUN) $(GO) vet ./.
+	$(DRUN) $(GO) vet ./...
 
 bash:
 	$(DRUN) /bin/bash
