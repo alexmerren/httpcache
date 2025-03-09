@@ -5,20 +5,43 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	createDatabaseQuery = "CREATE TABLE IF NOT EXISTS responses (request_url TEXT PRIMARY KEY, request_method TEXT, response_body BLOB, status_code INTEGER)"
-	saveRequestQuery    = "INSERT INTO responses (request_url, request_method, response_body, status_code) VALUES (?, ?, ?, ?)"
-	readRequestQuery    = "SELECT response_body, status_code FROM responses WHERE request_url = ? AND request_method = ?"
+	createDatabaseQuery = `
+	CREATE TABLE IF NOT EXISTS responses (
+		request_url TEXT PRIMARY KEY, 
+		request_method TEXT NOT NULL, 
+		response_body BLOB NOT NULL, 
+		status_code INTEGER NOT NULL, 
+		expiry_time INTEGER)`
+
+	saveRequestQuery = `
+	INSERT INTO responses (
+		request_url, 
+		request_method, 
+		response_body, 
+		status_code, 
+		expiry_time) 
+	VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT REPLACE`
+
+	readRequestQuery = `
+	SELECT response_body, status_code, expiry_time 
+	FROM responses 
+	WHERE request_url = ? AND request_method = ?`
 )
+
+// ErrNoDatabase denotes when the database does not exist or has not been
+// constructed correctly.
+var ErrNoDatabase = errors.New("no database connection")
 
 // SqliteCache is a default implementation of [Cache] which creates a local
 // SQLite cache to persist and to query HTTP responses.
@@ -57,26 +80,41 @@ func NewSqliteCache(databaseName string) (*SqliteCache, error) {
 	}, nil
 }
 
-func (s *SqliteCache) Save(response *http.Response) error {
-	return s.SaveContext(context.Background(), response)
+func (s *SqliteCache) Save(response *http.Response, expiryTime *time.Duration) error {
+	return s.SaveContext(context.Background(), response, expiryTime)
 }
 
 func (s *SqliteCache) Read(request *http.Request) (*http.Response, error) {
 	return s.ReadContext(context.Background(), request)
 }
 
-func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) error {
+func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response, expiryTime *time.Duration) error {
 	responseBody := bytes.NewBuffer(nil)
 	_, err := io.Copy(responseBody, response.Body)
 	if err != nil {
 		return err
 	}
 
+	var expiryTimestamp *int64
+	if expiryTime != nil {
+		calculatedExpiry := time.Now().Add(*expiryTime).Unix()
+		expiryTimestamp = &calculatedExpiry
+	} else {
+		expiryTimestamp = nil
+	}
+
 	// Reset the response body stream to the beginning to be read again.
 	response.Body = io.NopCloser(responseBody)
 
 	requestUrl := generateUrl(response.Request)
-	_, err = s.Database.Exec(saveRequestQuery, requestUrl, response.Request.Method, responseBody.Bytes(), response.StatusCode)
+	_, err = s.Database.Exec(
+		saveRequestQuery,
+		requestUrl,
+		response.Request.Method,
+		responseBody.Bytes(),
+		response.StatusCode,
+		expiryTimestamp,
+	)
 	if err != nil {
 		return err
 	}
@@ -86,7 +124,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response) 
 
 func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
 	if s.Database == nil {
-		return nil, fmt.Errorf("database is nil")
+		return nil, ErrNoDatabase
 	}
 
 	requestUrl := generateUrl(request)
@@ -94,12 +132,18 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 
 	var responseBody []byte
 	var responseStatusCode int
-	err := row.Scan(&responseBody, &responseStatusCode)
+	var expiryTime *int64
+
+	err := row.Scan(&responseBody, &responseStatusCode, &expiryTime)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNoResponse
 		}
 		return nil, err
+	}
+
+	if expiryTime != nil && time.Now().Unix() > *expiryTime {
+		return nil, ErrNoResponse
 	}
 
 	return &http.Response{

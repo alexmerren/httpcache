@@ -3,6 +3,7 @@ package httpcache
 import (
 	"errors"
 	"net/http"
+	"time"
 )
 
 var (
@@ -68,7 +69,13 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 
 	if t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
-		err = t.cache.Save(response)
+		var expiryTimestamp time.Time
+
+		if t.config.ExpiryTime != nil {
+			expiryTimestamp = time.Now().Add(*t.config.ExpiryTime)
+		}
+
+		err = t.cache.Save(response, &expiryTimestamp)
 		if err != nil {
 			response.Body.Close()
 			return nil, err
