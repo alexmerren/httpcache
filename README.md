@@ -26,6 +26,8 @@ go get -u github.com/alexmerren/httpcache
 
 Here's an example of using the `httpcache` module to cache responses:
 
+<!-- TODO UPDATE THIS!!!! -->
+
 ```go
 func main() {
 	// Create a new SQLite database to store HTTP responses.
@@ -69,3 +71,20 @@ func main() {
 ## ❓ Questions and Support
 
 Any questions can be submitted via [GitHub Issues](https://www.github.com/alexmerren/httpcache/issues). Feel free to start contributing or asking any questions required!
+
+## Roadmap
+
+- Implement cache interface in separate cache modules:
+	- [x] Sqlite
+	- [ ] Duckdb
+	- [ ] Redis
+- Make library thread safe to access cache.
+- Implement other features from https://pypi.org/project/requests-cache/
+	- [ ] Cache-control header for expiration time on individual records.
+	- [ ] Match headers to save different response on header value.
+	- [ ] Stale-if-error to use stale response if request errors out.
+	- [ ] (maybe) ignored parameters so don't save API keys?
+- Write full test suite!
+- Write benchmark tests
+- Write documentation and contribution guide
+
