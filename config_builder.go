@@ -13,14 +13,10 @@ type configBuilder struct {
 
 	// allowedStatusCodes only persists HTTP responses that have an appropriate
 	// status code (i.e. 200).
-	//
-	// This is a required field.
 	allowedStatusCodes *[]int
 
 	// allowedMethods only persists HTTP responses that use an appropriate HTTP
 	// method (i.e. "GET").
-	//
-	// This is a required field.
 	allowedMethods *[]string
 
 	// expiryTime invalidates HTTP responses after a duration has elapsed from
@@ -47,12 +43,12 @@ func (c *configBuilder) WithExpiryTime(expiryDuration time.Duration) *configBuil
 	return c
 }
 
-// Build constructs a [Config] that is ready to be consumed by [Transport]. If
+// Build constructs a [Config] that is ready to be consumed by [Cache]. If
 // the configuration passed by [configBuilder] is invalid, it will panic.
 func (c *configBuilder) Build() *Config {
 	return &Config{
-		AllowedStatusCodes: *c.allowedStatusCodes,
-		AllowedMethods:     *c.allowedMethods,
+		AllowedStatusCodes: c.allowedStatusCodes,
+		AllowedMethods:     c.allowedMethods,
 		ExpiryTime:         c.expiryTime,
 	}
 }

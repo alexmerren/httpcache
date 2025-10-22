@@ -3,6 +3,7 @@ package httpcache
 import (
 	"errors"
 	"net/http"
+	"time"
 )
 
 var (
@@ -27,13 +28,13 @@ type Transport struct {
 	// cache handles persisting HTTP responses.
 	cache Cache
 
-	// config describes which HTTP responses to cache and how they are cached.
+	// config handles logic on saving and reading HTTP responses.
 	config *Config
 }
 
 // NewTransport creates a [Transport]. If the cache is nil, return
 // [ErrMissingCache]. If the config is nil, return [ErrMissingConfig].
-func NewTransport(config *Config, cache Cache) (*Transport, error) {
+func NewTransport(cache Cache, config *Config) (*Transport, error) {
 	if cache == nil {
 		return nil, ErrMissingCache
 	}
@@ -50,42 +51,77 @@ func NewTransport(config *Config, cache Cache) (*Transport, error) {
 
 // RoundTrip wraps the [http.DefaultTransport] RoundTrip to execute HTTP
 // requests and persists, if necessary, the responses. If [Cache] returns
-// [ErrNoResponse], then execute a HTTP request and persist the response if
-// passing the criteria in [Transport.shouldSaveResponse].
+// [ErrNoResponse], then execute a HTTP request and persist the response
 func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
-	response, err := t.cache.Read(request)
-	if err == nil {
-		return response, nil
-	}
-
-	if !errors.Is(err, ErrNoResponse) {
+	result, err := t.cache.Read(request)
+	if err != nil && !errors.Is(err, ErrNoResult) {
 		return nil, err
 	}
 
-	response, err = t.transport.RoundTrip(request)
+	isValidResult := isValidResult(t.config, result)
+	if isValidResult {
+		return result.response, nil
+	}
+
+	resultIsInvalid := result != nil && !isValidResult
+	if resultIsInvalid {
+		err := t.cache.Delete(result.response)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	response, err := t.transport.RoundTrip(request)
 	if err != nil {
 		return nil, err
 	}
 
-	if t.shouldSaveResponse(response.StatusCode, response.Request.Method) {
-		err = t.cache.Save(response, t.config.ExpiryTime)
-		if err != nil {
-			response.Body.Close()
-			return nil, err
-		}
+	if ok := isEligibleToSave(t.config, response); !ok {
+		return response, nil
+	}
+
+	err = t.cache.Save(response)
+	if err != nil {
+		response.Body.Close()
+		return nil, err
 	}
 
 	return response, nil
 }
 
-// shouldSaveResponse is responsible for interpreting configuration values from
-// [Config] to determine if a HTTP response should be persisted. Any new values
-// added to [Config] can be used here as criteria.
-func (t *Transport) shouldSaveResponse(statusCode int, method string) bool {
-	isAllowedStatusCode := contains(t.config.AllowedStatusCodes, statusCode)
-	isAllowedMethod := contains(t.config.AllowedMethods, method)
+func isValidResult(config *Config, result *ReadResult) bool {
+	return isAllowedMethod(config, result.response.Request.Method) &&
+		isAllowedStatusCode(config, result.response.StatusCode) &&
+		isNotExpired(config, result.createdAt)
+}
 
-	return isAllowedStatusCode && isAllowedMethod
+func isEligibleToSave(config *Config, response *http.Response) bool {
+	return isAllowedMethod(config, response.Request.Method) &&
+		isAllowedStatusCode(config, response.StatusCode)
+}
+
+func isNotExpired(config *Config, createdAt *time.Time) bool {
+	hasExpiryTime := config.ExpiryTime != nil
+	if !hasExpiryTime {
+		return true
+	}
+	return time.Now().Before(createdAt.Add(*config.ExpiryTime))
+}
+
+func isAllowedStatusCode(config *Config, statusCode int) bool {
+	hasAllowedStatusCodes := config.AllowedStatusCodes != nil
+	if !hasAllowedStatusCodes {
+		return true
+	}
+	return contains(*config.AllowedStatusCodes, statusCode)
+}
+
+func isAllowedMethod(config *Config, method string) bool {
+	hasAllowedMethods := config.AllowedMethods != nil
+	if !hasAllowedMethods {
+		return true
+	}
+	return contains(*config.AllowedMethods, method)
 }
 
 func contains[T comparable](slice []T, searchValue T) bool {
@@ -94,5 +130,4 @@ func contains[T comparable](slice []T, searchValue T) bool {
 			return true
 		}
 	}
-	return false
 }

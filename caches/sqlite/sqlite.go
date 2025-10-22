@@ -1,4 +1,4 @@
-package httpcache
+package sqlite
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/alexmerren/httpcache"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -21,7 +22,7 @@ const (
 		request_method TEXT NOT NULL, 
 		response_body BLOB NOT NULL, 
 		status_code INTEGER NOT NULL, 
-		expiry_time INTEGER)`
+		created_at INTEGER NOT NULL)`
 
 	saveRequestQuery = `
 	INSERT OR REPLACE INTO responses (
@@ -29,11 +30,11 @@ const (
 		request_method, 
 		response_body, 
 		status_code, 
-		expiry_time) 
+		created_at) 
 	VALUES (?, ?, ?, ?, ?)`
 
 	readRequestQuery = `
-	SELECT response_body, status_code, expiry_time 
+	SELECT response_body, status_code, created_at 
 	FROM responses 
 	WHERE request_url = ? AND request_method = ?`
 )
@@ -42,16 +43,16 @@ const (
 // constructed correctly.
 var ErrNoDatabase = errors.New("no database connection")
 
-// SqliteCache is a default implementation of [Cache] which creates a local
-// SQLite cache to persist and to query HTTP responses.
-type SqliteCache struct {
+// SqliteDriver is a default implementation of [Cache] which creates a local
+// SQLite driver to persist and to query HTTP responses.
+type SqliteDriver struct {
 	Database *sql.DB
 }
 
-// NewSqliteCache creates a new SQLite database with a certain name. This name
+// NewSqliteDriver creates a new SQLite database with a certain name. This name
 // is the filename of the database. If the file does not exist, then we create
 // it. If the file is in a non-existent directory, we create the directory.
-func NewSqliteCache(databaseName string) (*SqliteCache, error) {
+func NewSqliteDriver(databaseName string) (*SqliteDriver, error) {
 	fileExists, err := doesFileExist(databaseName)
 	if err != nil {
 		return nil, err
@@ -74,36 +75,29 @@ func NewSqliteCache(databaseName string) (*SqliteCache, error) {
 		return nil, err
 	}
 
-	return &SqliteCache{
+	return &SqliteDriver{
 		Database: conn,
 	}, nil
 }
 
-func (s *SqliteCache) Save(response *http.Response, expiryTime *time.Duration) error {
-	return s.SaveContext(context.Background(), response, expiryTime)
+func (s *SqliteDriver) Save(response *http.Response) error {
+	return s.SaveContext(context.Background(), response)
 }
 
-func (s *SqliteCache) Read(request *http.Request) (*http.Response, error) {
+func (s *SqliteDriver) Read(request *http.Request) (*http.Response, error) {
 	return s.ReadContext(context.Background(), request)
 }
 
-func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response, expiryTime *time.Duration) error {
+func (s *SqliteDriver) SaveContext(ctx context.Context, response *httpcache.ReadResult) error {
 	responseBody := bytes.NewBuffer(nil)
 	_, err := io.Copy(responseBody, response.Body)
 	if err != nil {
 		return err
 	}
 
-	var expiryTimestamp *int64
-	if expiryTime != nil {
-		calculatedExpiry := time.Now().Add(*expiryTime).Unix()
-		expiryTimestamp = &calculatedExpiry
-	} else {
-		expiryTimestamp = nil
-	}
-
 	// Reset the response body stream to the beginning to be read again.
 	response.Body = io.NopCloser(responseBody)
+	now := time.Now().UnixMilli()
 
 	requestUrl := generateUrl(response.Request)
 	_, err = s.Database.Exec(
@@ -112,7 +106,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response, 
 		response.Request.Method,
 		responseBody.Bytes(),
 		response.StatusCode,
-		expiryTimestamp,
+		now,
 	)
 	if err != nil {
 		return err
@@ -121,7 +115,7 @@ func (s *SqliteCache) SaveContext(ctx context.Context, response *http.Response, 
 	return nil
 }
 
-func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
+func (s *SqliteDriver) ReadContext(ctx context.Context, request *http.Request) (*http.Response, error) {
 	if s.Database == nil {
 		return nil, ErrNoDatabase
 	}
@@ -131,18 +125,14 @@ func (s *SqliteCache) ReadContext(ctx context.Context, request *http.Request) (*
 
 	var responseBody []byte
 	var responseStatusCode int
-	var expiryTime *int64
+	var createdAt *int64
 
-	err := row.Scan(&responseBody, &responseStatusCode, &expiryTime)
+	err := row.Scan(&responseBody, &responseStatusCode, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNoResponse
+			return nil, httpcache.ErrNoResult
 		}
 		return nil, err
-	}
-
-	if expiryTime != nil && time.Now().Unix() > *expiryTime {
-		return nil, ErrNoResponse
 	}
 
 	return &http.Response{

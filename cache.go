@@ -12,24 +12,34 @@ import (
 type Cache interface {
 
 	// Save a response for a HTTP request using [context.Background].
-	Save(response *http.Response, expiryTime *time.Duration) error
+	Save(response *http.Response) error
 
 	// Read a saved response for a HTTP request using [context.Background].
-	Read(request *http.Request) (*http.Response, error)
+	Read(request *http.Request) (*ReadResult, error)
 
-	// Save a response for a HTTP request with a [context.Context]. expiryTime
-	// is the duration from [time.Now] to expire the response.
-	SaveContext(ctx context.Context, response *http.Response, expiryTime *time.Duration) error
+	// Delete a saved response using [context.Background].
+	Delete(response *http.Response) error
+
+	// Save a response for a HTTP request with a [context.Context].
+	SaveContext(ctx context.Context, response *http.Response) error
 
 	// Read a saved response for a HTTP request with a [context.Context]. If no
-	// response is saved for the corresponding request, or the expiryTime has
-	// been surpassed, then return [ErrNoResponse].
-	ReadContext(ctx context.Context, request *http.Request) (*http.Response, error)
+	// response is saved for the corresponding request.
+	ReadContext(ctx context.Context, request *http.Request) (*ReadResult, error)
+
+	// Delete a saved response with a [context.Context].
+	DeleteContext(ctx context.Context, response *http.Response) error
+}
+
+// ReadResult is the result of a successful read operation on the cache.
+type ReadResult struct {
+	response  *http.Response
+	createdAt *time.Time
 }
 
 var (
-	// ErrNoResponse describes when the cache does not have a response stored.
+	// ErrNoResult describes when the cache does not have a response stored.
 	// [Transport] will check if ErrNoResponse is returned from [Cache.Read]. If
 	// ErrNoResponse is returned, then the request/response will be saved with [Save].
-	ErrNoResponse = errors.New("no stored response")
+	ErrNoResult = errors.New("found no result from read")
 )
